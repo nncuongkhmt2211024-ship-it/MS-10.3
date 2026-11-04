@@ -3,7 +3,7 @@ server:
 
 spring:
   datasource:
-    url: jdbc:postgresql://localhost:5432/pharmacy_db
+    url: jdbc:postgresql://localhost:5432/cuongdb
     username: postgres
     password: m01668516412
     driver-class-name: org.postgresql.Driver

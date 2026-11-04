@@ -2,8 +2,8 @@ package cuong.com.pharmacyservice.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import cuong.com.pharmacyservice.model.OrderEvent;
-import cuong.com.pharmacyservice.entity.Order; // Entity đơn hàng của bạn
-import cuong.com.pharmacyservice.entity.Medicine; // Entity thuốc của bạn
+import cuong.com.pharmacyservice.entity.Order;
+import cuong.com.pharmacyservice.entity.Medicine;
 import cuong.com.pharmacyservice.repository.OrderRepository;
 import cuong.com.pharmacyservice.repository.MedicineRepository;
 import org.springframework.kafka.annotation.KafkaListener;
@@ -26,27 +26,25 @@ public class OrderConsumerService {
     @Transactional
     public void consumeOrderEvent(String message) {
         try {
-            // 1. Chuyển đổi chuỗi JSON từ Kafka thành OrderEvent
+            // 1. Nhận sự kiện từ Kafka
             OrderEvent event = objectMapper.readValue(message, OrderEvent.class);
             System.out.println("-> Consumer nhận được sự kiện: " + message);
 
-            // 2. Thực hiện INSERT đơn hàng mới vào bảng orders (Tương ứng log Hibernate 1)
+            // 2. Tìm thuốc và trừ tồn kho (UPDATE medicines)
+            Medicine medicine = medicineRepository.findById(Long.valueOf(event.getMedicineId()))
+                    .orElseThrow(() -> new RuntimeException("Không tìm thấy thuốc có ID: " + event.getMedicineId()));
+
+            medicine.setQuantity(medicine.getQuantity() - event.getQuantity());
+            medicineRepository.save(medicine);
+
+            // 3. Thêm mới đơn hàng (INSERT orders)
             Order order = new Order();
             order.setMedicineId(Long.valueOf(event.getMedicineId()));
             order.setQuantity(event.getQuantity());
             order.setTimestamp(event.getTimestamp());
-            // Thiết lập thêm giá bán, tổng tiền tùy theo thiết kế database của bạn
             orderRepository.save(order);
 
-            // 3. Thực hiện SELECT và UPDATE trừ tồn kho trong bảng medicines (Tương ứng log Hibernate 2 & 3)
-            Medicine medicine = medicineRepository.findById(Long.valueOf(event.getMedicineId()))
-                    .orElseThrow(() -> new RuntimeException("Không tìm thấy thuốc có ID: " + event.getMedicineId()));
-
-            // Trừ số lượng tồn kho
-            medicine.setQuantity(medicine.getQuantity() - event.getQuantity());
-            medicineRepository.save(medicine);
-
-            // 4. In thông báo thành công giống hệt kết quả mong muốn
+            // 4. In thông báo thành công khớp mẫu
             System.out.println("Thêm mới đơn hàng thành công !");
 
         } catch (Exception e) {
